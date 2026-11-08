@@ -1,0 +1,41 @@
+# Expenses. Categories, limits, approval chains, currencies and the links to HR and Time are in expenses.yaml; claims
+# are sent, approved and paid through the API.
+#
+#   openssl rand -hex 32 > openasy-kek   # the product's key: sign-in secrets (ADR 0021). Keep it with your backups
+#   docker compose up -d
+#   docker compose logs expenses | grep 'no owner yet'   # the one-time link that creates the owner account
+services:
+  expenses:
+    image: ghcr.io/openasy/expenses:0.1.0
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: [/tmp]
+    ports:
+      - "127.0.0.1:8080:8080" # API; put a TLS proxy in front
+    volumes:
+      - expenses-data:/data # SQLite database: claims, receipts' files, card statements and rates
+      - ./config:/config:ro # expenses.yaml; mount the folder so an editor's save reaches it
+    secrets:
+      - openasy-kek # mounted at /run/secrets/openasy-kek
+    environment:
+      # The address people open Expenses at.
+      EXPENSES_PUBLIC_URL: ${EXPENSES_PUBLIC_URL:-http://localhost:8080}
+      EXPENSES_CONFIG: /config/expenses.yaml
+      # The secrets expenses.yaml names, never written in the file itself:
+      # EXPENSES_HR_TOKEN: ${EXPENSES_HR_TOKEN}         # an HR token that reads people
+      # EXPENSES_TIME_TOKEN: ${EXPENSES_TIME_TOKEN}     # a Time token that reads projects
+      # EXPENSES_READER_TOKEN: ${EXPENSES_READER_TOKEN} # the receipt reader's, if it asks for one
+      # Sign in with your identity provider (OIDC), see the README:
+      # OPENASY_OIDC_ISSUER: https://login.example.com
+      # OPENASY_OIDC_CLIENT_ID: expenses
+      # OPENASY_OIDC_CLIENT_SECRET: ${OPENASY_OIDC_CLIENT_SECRET}
+      # OPENASY_OIDC_DEFAULT_ROLE: user   # everyone who signs in may send their own claims
+
+volumes:
+  expenses-data:
+
+secrets:
+  openasy-kek:
+    file: ./openasy-kek

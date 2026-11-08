@@ -1,0 +1,77 @@
+# Expenses' settings. This file is the only place they are changed; a change is picked up within a minute, and a file
+# with a mistake leaves the last good one in place. Claims are sent, approved and paid through the API.
+time_zone: Europe/Istanbul
+
+# Receipts in other currencies are turned into TRY with TCMB's rate. Leave it out to take every currency TCMB publishes.
+currencies: [EUR, USD, GBP]
+rates:
+  use: forex_buying # döviz alış; or forex_selling, banknote_buying, banknote_selling
+  day: previous # the rates announced the business day before the receipt's date; same takes that day's
+
+receipts:
+  max_size: 10MB
+  types: [jpeg, png, webp, heic, pdf]
+  max_age: 90d # older receipts are flagged for finance
+  # A service on your network that reads a receipt's amount, date and seller (POST /read, see the README).
+  # reader: { url: http://receipt-reader:8080, token: EXPENSES_READER_TOKEN, min_confidence: 0.8 }
+
+kdv_rates: [0%, 1%, 10%, 20%]
+
+# Each category: its account code for the accountant, the KDV its receipts usually carry, its limits per person in
+# TRY (per_item, per_day, per_month), and what going over does: flag (finance approves it), block (the claim cannot be
+# sent) or cap (paid back up to the limit). project: required, optional or none.
+categories:
+  travel: { name: Travel, account: "770.01", kdv: 20% }
+  taxi: { name: Taxi, account: "770.01", kdv: 20%, limit: { per_item: 1500 } }
+  meals: { name: Meals, account: "770.02", kdv: 10%, limit: { per_day: 750 } }
+  hotel: { name: Hotel, account: "770.03", kdv: 10%, limit: { per_item: 5000 }, over_limit: cap }
+  client-gifts: { name: Client gifts, account: "760.05", kdv: 20%, limit: { per_item: 1000 }, over_limit: block, project: required }
+  software: { name: Software, account: "770.05", kdv: 20%, limit: { per_month: 3000 } }
+  mileage: { name: Mileage, kind: mileage, rate: 8.50, account: "770.04" } # TL per km driven in your own car
+  per-diem: # a day's allowance, by country; days away are counted in half days
+    name: Daily allowance
+    kind: per_diem
+    account: "770.06"
+    rates: { TR: 600, DE: 60 EUR, GB: 55 GBP, default: 50 EUR }
+
+# Who approves. A step applies when the claim's total is over its amount (in TRY); manager is the person's manager
+# from HR (or people below), finance is any member with the editor role. Nobody approves their own claim, and an item
+# over a limit, without a receipt, late or that looks like a duplicate also brings finance in.
+approvals:
+  chain:
+    - manager
+    - { approver: finance, over: 10000 }
+    - { approver: cfo@example.com, over: 50000 }
+  departments:
+    engineering:
+      - manager
+      - { approver: cto@example.com, over: 20000 }
+      - { approver: finance, over: 20000 }
+
+departments:
+  sales: Sales
+  engineering: Engineering
+  finance: Finance
+
+# Used until HR is linked: each person's department and manager.
+people:
+  ali@example.com: { name: Ali Demir, department: sales, manager: emily@example.com, employee_id: "1042" }
+  emily@example.com: { name: Emily Clark, department: sales, manager: cfo@example.com, employee_id: "1007" }
+
+# Used until Time is linked: what expenses can be charged to.
+projects:
+  acme: Acme rollout
+  internal: Internal
+
+# Company card statements, imported as the bank's CSV. A card is given to its holder by its last four digits.
+cards:
+  holders: { "4417": ali@example.com }
+  match_days: 3 # a receipt matches a purchase with the same amount this many days apart
+  purchases: positive # how the statement writes a purchase
+  # columns: { date: İşlem Tarihi, description: Açıklama, amount: Tutar, card: Kart No }
+
+# What the accountant's CSV looks like: Excel in Turkish reads ; and ,
+exports: { separator: ";", decimal: "," }
+
+# hr: { url: http://hr:8080, token: EXPENSES_HR_TOKEN, every: 15m }       # people, departments and managers
+# time: { url: http://time:8080, token: EXPENSES_TIME_TOKEN, every: 15m } # projects
