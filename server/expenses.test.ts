@@ -57,6 +57,15 @@ describe("Ali's customer visit: photographed, approved and paid with his salary"
     });
     expect(taxi.body).toMatchObject({ document: "none", vat: [], flags: [{ code: "no-receipt", finance: true }] });
 
+    // Before sending, the draft shows who would approve it: the steps that sending then makes.
+    const draft = await app.as(ALI)("GET", `/api/v1/claims/${id}`);
+    expect(draft.body.steps).toEqual([]);
+    expect(draft.body.plan.map((s: any) => [s.kind, s.approver?.email ?? null])).toEqual([
+      ["manager", "emily@example.com"],
+      ["finance", null],
+    ]);
+    expect(draft.body.plan[1].why).toMatch(/an item without a receipt/);
+
     const sent = await app.as(ALI)("POST", `/api/v1/claims/${id}/submit`);
     expect(sent.status).toBe(200);
     expect(sent.body).toMatchObject({ state: "submitted", total: 89_000, reimbursable: 89_000, department: { id: "sales", name: "Sales" } });
@@ -64,6 +73,7 @@ describe("Ali's customer visit: photographed, approved and paid with his salary"
       ["manager", "emily@example.com", "pending"],
       ["finance", null, "waiting"],
     ]);
+    expect(sent.body.plan).toEqual([]);
 
     // Emily sees it waiting for her, and nobody else's.
     const mine = await app.as(EMILY)("GET", "/api/v1/claims?scope=approvals");

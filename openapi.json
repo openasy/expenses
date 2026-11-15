@@ -5250,6 +5250,7 @@
           "canDecide",
           "lines",
           "steps",
+          "plan",
           "blocks",
           "history"
         ],
@@ -5593,6 +5594,65 @@
             "items": {
               "$ref": "#/components/schemas/Step"
             }
+          },
+          "plan": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "kind",
+                "approver",
+                "why"
+              ],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "manager",
+                    "finance",
+                    "member"
+                  ]
+                },
+                "approver": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "email",
+                        "name",
+                        "member"
+                      ],
+                      "properties": {
+                        "email": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "member": {
+                          "type": "boolean",
+                          "description": "Whether they are a member of Expenses and can approve."
+                        }
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "why": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A draft: who would approve it if it were sent now. Empty once it is sent."
           },
           "blocks": {
             "type": "array",

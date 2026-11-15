@@ -20,8 +20,10 @@ expenses.yaml ──▶ expenses ◀── Payroll: GET /api/v1/payroll?month=, 
                      └──▶ a receipt reader on your network: POST /read (optional)
 ```
 
-**No screens yet.** The Claims and Spend screens are not designed, so this release is the server and its API only;
-there is no `web/` folder. Everything below is done through the API (reference at `/api/docs/`).
+Its pages follow the Expenses screens in the [ui](https://github.com/openasy/ui) Storybook: my claims with receipts
+photographed and read, trips by car and days away, claims waiting for my approval, every sent claim for finance,
+company card purchases, paying back in batches, spend by category, department, project, person or month, and the
+exports. The image also serves the API and its reference at `/api/docs/`.
 
 ## Claims and items
 
@@ -85,6 +87,7 @@ when the claim's total is over its `over`. `manager` is the person's manager fro
 - Approve, reject (for good) and send back (to draft, with what to change) are the waiting step's. Rejecting and
   sending back need a reason. The claimant can withdraw a claim while it waits. Sending it again starts a new round.
 - Finance passes a waiting step to another member (`POST /claims/{id}/reassign`): a manager away or not a member yet.
+- A draft carries its `plan`: who would approve it if it were sent now, so the claimant sees it before sending.
 - A claim the company card paid in full is paid the moment it is approved: nothing is owed.
 
 ## Paying back
@@ -212,14 +215,9 @@ docker compose up -d
 docker compose logs expenses | grep 'no owner yet'
 ```
 
-There is no default password (ADR 0013). Until the screens exist, the first start's link opens nothing; post its
-`setup` token to the API, then add an authenticator app (`/api/v1/auth/me/totp`), as owners must, before adding members
-and tokens:
-
-```bash
-curl -X POST http://localhost:8080/api/v1/auth/setup -H 'content-type: application/json' \
-  -d '{"token":"<setup from the link>","name":"Selin Aydın","email":"selin@example.com","password":"<12 or more characters>"}'
-```
+Open the link from the log once to create the owner account; there is no default password (ADR 0013). Owners and
+admins who sign in with a password then add an authenticator app before anything else (ADR 0002). Everyone else is
+invited as a member with the user role, or comes in through your identity provider.
 
 | Variable | Default | |
 | --- | --- | --- |
@@ -231,6 +229,7 @@ curl -X POST http://localhost:8080/api/v1/auth/setup -H 'content-type: applicati
 | `EXPENSES_SECRETS_KEY_FILE` | `/run/secrets/openasy-kek` | 32-byte key-encryption key: sign-in secrets |
 | `EXPENSES_DB` | `/data/expenses.db` | SQLite file (WAL) with the receipts' files, on the `/data` volume |
 | `EXPENSES_METRICS_PORT` | | Serve `/metrics` on this port only (ADR 0026) |
+| `EXPENSES_HEADLESS` | `false` | `true` serves no pages; the API stays |
 | `EXPENSES_PASSWORD_SIGN_IN`, `OPENASY_OIDC_*` | | Sign-in, as in every OpenAsy product ([@openasy/auth](https://github.com/openasy/auth)); `OPENASY_OIDC_DEFAULT_ROLE=user` lets everyone in your provider send claims |
 
 The container runs as non-root with a read-only root filesystem, no capabilities and `no-new-privileges`. Metrics
@@ -246,6 +245,7 @@ npm test           # money in whole numbers, TCMB's files and holidays, KDV, the
                    # month, reports, the CSV and ZIP exports, HR and Time against fakes, and every API response
                    # against openapi.json
 npm run openapi    # writes openapi.json after an API change; a test fails while it is out of date
+npm run dev        # the pages, with the API on :8080
 npm start          # the API on :8080, with EXPENSES_CONFIG=config/expenses.yaml EXPENSES_DB=./data/expenses.db
 ```
 

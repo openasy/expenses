@@ -7,13 +7,13 @@ RUN npm ci --no-audit --no-fund
 COPY . .
 RUN npm run build && npm prune --omit=dev && mkdir -p /out/data
 
-# Node runs the TypeScript sources directly; only production dependencies are copied. There are no screens yet: the
-# image serves the API and its reference.
+# Node runs the TypeScript sources directly; only production dependencies are copied.
 FROM gcr.io/distroless/nodejs26-debian13:nonroot
 WORKDIR /app
 COPY --from=build /app/package.json /app/openapi.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/server ./server
+COPY --from=build /app/dist/web ./dist/web
 COPY --from=build /app/dist/docs ./dist/docs
 COPY --from=build --chown=nonroot:nonroot /out/data /data
 # Everything that is written goes to /data, receipts included, so the root filesystem can be read-only (ADR 0022).

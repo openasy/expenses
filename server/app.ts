@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { extname, join, normalize } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
-import { atLeast, AuthError, mergeOpenApi, sendProblem, type Auth, type Role } from "@openasy/auth";
+import { atLeast, AuthError, identityOrigin, mergeOpenApi, sendProblem, type Auth, type Role } from "@openasy/auth";
 import type { Cards } from "./cards.ts";
 import { csvText } from "./csv.ts";
 import type { Expenses } from "./expenses.ts";
@@ -26,6 +26,8 @@ export interface AppOptions {
   adminToken?: string;
   /** For tests only: bearer tokens that act as these members, with their email. main.ts never sets it. */
   testTokens?: Record<string, Actor>;
+  /** Built web UI; omit to run headless (ADR 0018). */
+  webDir?: string;
   /** Built API reference (Swagger UI), served at /api/docs. */
   docsDir?: string;
   /** The OpenAPI description, served at /api/openapi.json with this release's version. */
@@ -59,13 +61,15 @@ const TYPES: Record<string, string> = {
   ".woff2": "font/woff2",
 };
 
-/** The pages run nothing from elsewhere. */
+// Identity keeps people's theme and language when they sign in through it; the pages read them there (ADR 0033).
+const IDENTITY = identityOrigin(process.env);
+
+/** The pages run nothing from elsewhere; receipt photos are shown from this origin only. */
 const SECURITY_HEADERS = {
   "x-content-type-options": "nosniff",
   "referrer-policy": "no-referrer",
   "x-frame-options": "DENY",
-  "content-security-policy":
-    "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; form-action 'self'; frame-ancestors 'none'",
+  "content-security-policy": `default-src 'self'; connect-src 'self'${IDENTITY ? ` ${IDENTITY}` : ""}; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; form-action 'self'; frame-ancestors 'none'`,
 };
 
 function send(res: ServerResponse, status: number, body: string | Buffer, type = "application/json", headers: Record<string, string> = {}) {
@@ -175,6 +179,7 @@ export function createApp({
   auth,
   adminToken,
   testTokens = {},
+  webDir,
   docsDir,
   openapi,
   serveMetrics = true,
@@ -410,10 +415,10 @@ export function createApp({
     }
 
     if (path.startsWith("/api/")) return (problem(res, 404, "not-found"), "/api/*");
-    // No screens yet: the API is the product until they are designed.
-    if (path === "/" && (req.method === "GET" || req.method === "HEAD")) {
-      send(res, 200, `OpenAsy Expenses ${version}. The API is at /api/v1; its reference at /api/docs/.\n`, "text/plain; charset=utf-8");
-      return "/";
+
+    if (webDir && (req.method === "GET" || req.method === "HEAD")) {
+      if (!(await serveFile(res, webDir, path === "/" ? "index.html" : path))) send(res, 200, await readFile(join(webDir, "index.html")), TYPES[".html"]);
+      return "/web";
     }
     problem(res, 404, "not-found");
     return "unmatched";

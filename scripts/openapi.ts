@@ -68,11 +68,12 @@ const Flag = obj(
 const Vat = obj({ rate: { type: "number", description: "The KDV rate, from the file's kdv_rates." }, amount: kurus("The KDV at that rate, in kuruş.") });
 const Named = obj({ id: str, name: str });
 
+const approverObj = obj({ email: str, name: nul(str), member: { type: "boolean", description: "Whether they are a member of Expenses and can approve." } });
 const Step = obj({
   id: str,
   position: int,
   kind: en("manager", "finance", "member"),
-  approver: nul(obj({ email: str, name: nul(str), member: { type: "boolean", description: "Whether they are a member of Expenses and can approve." } })),
+  approver: nul(approverObj),
   why: str,
   state: en("waiting", "pending", "approved", "rejected", "returned", "cancelled"),
   by: nul(obj({ id: str, name: str })),
@@ -300,6 +301,10 @@ const schemas: Record<string, S> = {
     ...claimProps,
     lines: arr(ref("Item")),
     steps: arr(ref("Step")),
+    plan: {
+      ...arr(obj({ kind: en("manager", "finance", "member"), approver: nul(approverObj), why: str })),
+      description: "A draft: who would approve it if it were sent now. Empty once it is sent.",
+    },
     blocks: { ...arr(str), description: "What stops a draft from being sent." },
     history: arr(obj({ at: dt, by: obj({ id: nul(str), name: str }), action: str, text: nul(str) })),
   }),

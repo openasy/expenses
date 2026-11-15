@@ -14,7 +14,10 @@ const { version } = JSON.parse(readFileSync(new URL("../package.json", import.me
 const port = Number(process.env.PORT ?? 8080);
 const dbPath = process.env.EXPENSES_DB ?? "/data/expenses.db";
 const configPath = process.env.EXPENSES_CONFIG?.trim() || "/config/expenses.yaml";
+const webDir = new URL("../dist/web", import.meta.url).pathname;
 const docsDir = new URL("../dist/docs", import.meta.url).pathname;
+// true to serve the API without the web UI (ADR 0018).
+const headless = process.env.EXPENSES_HEADLESS === "true";
 const openapi = JSON.parse(readFileSync(new URL("../openapi.json", import.meta.url), "utf8")) as Record<string, unknown>;
 // Set it to keep /metrics off the port that is published or behind an ingress (ADR 0026).
 const metricsPort = process.env.EXPENSES_METRICS_PORT ? Number(process.env.EXPENSES_METRICS_PORT) : undefined;
@@ -63,6 +66,7 @@ const server = createServer(
     reports: createReports(expenses),
     version,
     auth,
+    webDir: !headless && existsSync(webDir) ? webDir : undefined,
     docsDir: existsSync(docsDir) ? docsDir : undefined,
     openapi,
     serveMetrics: metricsPort === undefined,
@@ -72,18 +76,14 @@ const server = createServer(
 const metricsServer = metricsPort !== undefined ? createServer(createMetricsHandler(expenses, version)) : undefined;
 metricsServer?.listen(metricsPort, () => log("info", "metrics on their own port", { port: metricsPort }));
 
-server.listen(port, () => log("info", "expenses started", { version, port, db: dbPath, config: configPath }));
+server.listen(port, () => log("info", "expenses started", { version, port, db: dbPath, config: configPath, headless }));
 if (!publicUrl.startsWith("https://") && !/^http:\/\/(localhost|127\.0\.0\.1)(:|$)/.test(publicUrl))
   log("warn", "EXPENSES_PUBLIC_URL is not https: browsers will not keep secure cookies or allow passkeys. Put it behind TLS (ADR 0026)", { url: publicUrl });
 if (auth.secretsInClear)
   log("warn", "no secrets key: TOTP secrets are stored unencrypted. Mount a 32-byte key (openssl rand -hex 32)", { file: secretsKeyFile });
 const setup = auth.setupLink();
 // No default password (ADR 0013): the first person to open this link becomes the owner.
-// There are no screens yet: the link's token is sent to POST /api/v1/auth/setup with the owner's email, name and password.
-if (setup)
-  log("info", "no owner yet: open this link once to create the owner account, or POST its setup token to /api/v1/auth/setup", {
-    url: setup,
-  });
+if (setup) log("info", "no owner yet: open this link once to create the owner account", { url: setup });
 
 const timers: NodeJS.Timeout[] = [setInterval(() => auth.purge(), 5 * 60_000), setInterval(() => void expenses.tick(), 15_000)];
 void expenses.tick();

@@ -1224,6 +1224,24 @@ export function createExpenses(db: DatabaseSync, opts: ExpensesOptions) {
     return !one("SELECT 1 FROM steps WHERE claim_id = ? AND round = ? AND state = 'approved' AND by_id = ?", c.id, c.round, who.id);
   }
 
+  /** Who approves a claim sent as it is now: the file's chain for its total and department, and finance for flags. */
+  function planFor(conf: Config, c: ClaimRow) {
+    const p = person(c.owner_email);
+    const flags = q<ItemRow>("SELECT * FROM items WHERE claim_id = ?", c.id).flatMap(flagsOf);
+    const reasons = [...new Set(flags.filter((f) => f.finance).map((f) => f.code))].map(
+      (code) =>
+        ({
+          "over-limit": "over a limit",
+          "no-receipt": "an item without a receipt",
+          duplicate: "a possible duplicate",
+          "same-file": "a receipt file used before",
+          late: "a late receipt",
+          "receipt-differs": "a receipt that reads otherwise",
+        })[code],
+    );
+    return planChain(conf, { ownerEmail: c.owner_email, department: p?.department ?? null, total: c.total }, p?.manager_email ?? null, reasons);
+  }
+
   function claimOut(c: ClaimRow, who: Actor, full = false) {
     const steps = stepsOf(c);
     const pending = steps.find((s) => s.state === "pending");
@@ -1266,6 +1284,18 @@ export function createExpenses(db: DatabaseSync, opts: ExpensesOptions) {
       ...base,
       lines,
       steps: steps.map(stepOut),
+      // A draft shows who would approve it if it were sent now, so the claimant knows before sending.
+      plan:
+        c.state === "draft" && config
+          ? planFor(config, c).map((s) => {
+              const m = s.approver ? memberByEmail(s.approver) : undefined;
+              return {
+                kind: s.kind,
+                approver: s.approver ? { email: s.approver, name: m?.name ?? person(s.approver)?.name ?? null, member: !!m } : null,
+                why: s.why,
+              };
+            })
+          : [],
       blocks,
       history: q<{ at: string; by_id: string | null; by_name: string; action: string; text: string | null }>(
         "SELECT at, by_id, by_name, action, text FROM events WHERE claim_id = ? ORDER BY id",
@@ -1395,19 +1425,7 @@ export function createExpenses(db: DatabaseSync, opts: ExpensesOptions) {
     return tx(() => {
       const now = mustClaim(c.id);
       const p = person(now.owner_email);
-      const flags = q<ItemRow>("SELECT * FROM items WHERE claim_id = ?", c.id).flatMap(flagsOf);
-      const reasons = [...new Set(flags.filter((f) => f.finance).map((f) => f.code))].map(
-        (code) =>
-          ({
-            "over-limit": "over a limit",
-            "no-receipt": "an item without a receipt",
-            duplicate: "a possible duplicate",
-            "same-file": "a receipt file used before",
-            late: "a late receipt",
-            "receipt-differs": "a receipt that reads otherwise",
-          })[code],
-      );
-      const plan = planChain(conf, { ownerEmail: now.owner_email, department: p?.department ?? null, total: now.total }, p?.manager_email ?? null, reasons);
+      const plan = planFor(conf, now);
       const round = now.round + 1;
       plan.forEach((s, i) =>
         run(

@@ -1,5 +1,5 @@
 # Expenses. Categories, limits, approval chains, currencies and the links to HR and Time are in expenses.yaml; claims
-# are sent, approved and paid through the API.
+# are sent, approved and paid in the UI.
 #
 #   openssl rand -hex 32 > openasy-kek   # the product's key: sign-in secrets (ADR 0021). Keep it with your backups
 #   docker compose up -d

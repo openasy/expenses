@@ -1,0 +1,52 @@
+/* The few layouts this product needs that @openasy/ui's prebuilt styles do not include. Colours stay in the library's tokens. */
+
+.exp-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.exp-halves,
+.exp-side,
+.exp-form2 {
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 640px) {
+  .exp-form2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .exp-span2 {
+    grid-column: span 2;
+  }
+}
+@media (min-width: 1280px) {
+  .exp-halves {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .exp-side {
+    grid-template-columns: minmax(0, 1fr) 320px;
+  }
+}
+
+.exp-settings-list {
+  grid-template-columns: minmax(120px, 40%) minmax(0, 1fr);
+  margin: 0;
+}
+
+.exp-code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.exp-icon {
+  display: inline-flex;
+}
+.exp-icon svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+/* An amount and its currency on one row: the amount takes the room, the currency what its code needs. */
+.exp-amount {
+  grid-template-columns: minmax(0, 1fr) 6rem;
+}

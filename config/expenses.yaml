@@ -1,5 +1,5 @@
 # Expenses' settings. This file is the only place they are changed; a change is picked up within a minute, and a file
-# with a mistake leaves the last good one in place. Claims are sent, approved and paid through the API.
+# with a mistake leaves the last good one in place. Claims are sent, approved and paid in the UI.
 time_zone: Europe/Istanbul
 
 # Receipts in other currencies are turned into TRY with TCMB's rate. Leave it out to take every currency TCMB publishes.
